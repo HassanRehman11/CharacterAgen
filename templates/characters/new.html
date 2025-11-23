@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+  <div class="col-lg-8 mx-auto">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="card-title mb-4">Create Character</h2>
+        <form method="post" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label class="form-label">Character Name</label>
+            <input type="text" class="form-control" name="name" required value="{{ request.form.name or '' }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Prompt Template</label>
+            <select class="form-select" id="character-template-select">
+              <option value="" selected>Select a template…</option>
+              {% for template in prompt_templates %}
+              <option value="{{ template.prompt|e }}">{{ template.title }}</option>
+              {% endfor %}
+              <option value="custom">Custom prompt…</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Character Prompt (optional)</label>
+            <textarea class="form-control" id="character-prompt-text" name="prompt" rows="3" placeholder="Describe how to transform the uploaded portrait">{{ request.form.prompt or default_prompt }}</textarea>
+            <div class="form-text">Leave empty to use the original image without transformation.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Upload Portrait (optional)</label>
+            <input type="file" class="form-control" name="image" accept="image/*">
+            <div class="form-text">Leave empty to generate a new portrait from the prompt.</div>
+          </div>
+            <div class="d-flex justify-content-end">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary me-2">Back</a>
+            <button type="submit" class="btn btn-primary" id="save-character-btn">Save Character</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% if character_rows %}
+<div class="row mt-4">
+  <div class="col-lg-10 mx-auto">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h3 class="card-title mb-3">Existing Characters</h3>
+        <div class="table-responsive">
+          <table class="table table-striped align-middle">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Created</th>
+                <th>Preview</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for character, preview_path in character_rows %}
+              <tr>
+                <td>{{ character.name }}</td>
+                <td>{{ character.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>
+                  {% if preview_path %}
+                  <img src="{{ url_for('serve_file', rel_path=preview_path) }}" alt="{{ character.name }}" class="img-thumbnail" style="max-width: 120px;">
+                  {% else %}
+                  <span class="text-muted">No preview</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="d-flex gap-2">
+                    {% if preview_path %}
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#imageModal" data-image-url="{{ url_for('serve_file', rel_path=preview_path) }}" data-image-title="{{ character.name }}">View</button>
+                    {% endif %}
+                    <form method="post" action="{{ url_for('delete_character', character_id=character.id) }}" class="delete-form d-inline" data-confirm="Delete this character and related scenes/videos?">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+  const templateSelect = document.getElementById("character-template-select");
+  const promptText = document.getElementById("character-prompt-text");
+
+  if (templateSelect) {
+    templateSelect.addEventListener("change", (event) => {
+      const value = event.target.value;
+      if (value === "custom") {
+        promptText.value = "";
+        promptText.focus();
+      } else if (value) {
+        promptText.value = value;
+      }
+    });
+  }
+</script>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="imageModalLabel">Character Image</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img id="modalImage" src="" alt="Character" class="img-fluid" style="max-height: 80vh;">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Handle modal image display
+  const imageModal = document.getElementById('imageModal');
+  if (imageModal) {
+    imageModal.addEventListener('show.bs.modal', function (event) {
+      const button = event.relatedTarget;
+      const imageUrl = button.getAttribute('data-image-url');
+      const imageTitle = button.getAttribute('data-image-title');
+      const modalImage = imageModal.querySelector('#modalImage');
+      const modalTitle = imageModal.querySelector('#imageModalLabel');
+      
+      modalImage.src = imageUrl;
+      modalImage.alt = imageTitle;
+      modalTitle.textContent = imageTitle;
+    });
+  }
+</script>
+{% endblock %}
+

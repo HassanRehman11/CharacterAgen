@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+  <div class="col-lg-8 mx-auto">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="card-title mb-4">Create Scene</h2>
+        {% if characters %}
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">Select Character</label>
+            <select class="form-select" name="character_id" required>
+              <option value="" disabled selected>Choose character…</option>
+              {% for character in characters %}
+              <option value="{{ character.id }}">{{ character.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Theme</label>
+            <select class="form-select" name="theme" id="theme-select" required>
+              <option value="newsroom">Newsroom</option>
+              <option value="podcast">Podcast Studio</option>
+              <option value="boardroom">Boardroom Presentation</option>
+              <option value="custom">Custom Prompt</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Prompt Template</label>
+            <select class="form-select" id="scene-template-select">
+              <option value="" selected>Select a template…</option>
+              {% for template in prompt_templates %}
+              <option value="{{ template.prompt|e }}">{{ template.title }}</option>
+              {% endfor %}
+              <option value="custom">Custom prompt…</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Scene Prompt</label>
+            <textarea class="form-control" name="prompt" id="prompt-textarea" rows="4" required>{{ default_prompt }}</textarea>
+            <div class="form-text">You can adjust the prompt to fine-tune the generated scene.</div>
+          </div>
+          <div class="d-flex justify-content-end">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary me-2">Back</a>
+            <button type="submit" class="btn btn-primary" id="generate-scene-btn">Generate Scene</button>
+          </div>
+        </form>
+        {% else %}
+        <div class="alert alert-warning">
+          You need to create a character before generating a scene.
+          <a href="{{ url_for('new_character') }}" class="alert-link">Create character</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if scene_rows %}
+<div class="row mt-4">
+  <div class="col-lg-10 mx-auto">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h3 class="card-title mb-3">Recent Scenes</h3>
+        <div class="table-responsive">
+          <table class="table table-striped align-middle">
+            <thead>
+              <tr>
+                <th>Character</th>
+                <th>Theme</th>
+                <th>Created</th>
+                <th>Preview</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for scene, scene_path in scene_rows %}
+              <tr>
+                <td>{{ scene.character.name }}</td>
+                <td>{{ scene.theme }}</td>
+                <td>{{ scene.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <img src="{{ url_for('serve_file', rel_path=scene_path) }}" alt="Scene" class="img-thumbnail" style="max-width: 150px;">
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#imageModal" data-image-url="{{ url_for('serve_file', rel_path=scene_path) }}" data-image-title="{{ scene.character.name }} - {{ scene.theme }}">View</button>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+  const themeSelect = document.getElementById('theme-select');
+  const promptTextarea = document.getElementById('prompt-textarea');
+  const templateSelect = document.getElementById('scene-template-select');
+
+  if (templateSelect) {
+    templateSelect.addEventListener('change', (event) => {
+      const value = event.target.value;
+      if (value === 'custom') {
+        promptTextarea.value = '';
+        promptTextarea.focus();
+      } else if (value) {
+        promptTextarea.value = value;
+      }
+    });
+  }
+
+  const prompts = {
+    newsroom: "Transform the character into a charismatic news anchor sitting at a modern news desk with studio lights and a large screen backdrop displaying JobSite Sentry branding.",
+    podcast: "Place the character in a warm podcast studio environment with microphones, acoustic panels, and JobSite Sentry colors subtly present in the background.",
+    boardroom: "Show the character leading a professional boardroom presentation with JobSite Sentry dashboards and analytics on a large wall display.",
+  };
+
+  if (themeSelect) {
+    themeSelect.addEventListener('change', (event) => {
+      if (event.target.value === 'custom') {
+        promptTextarea.value = '';
+        promptTextarea.focus();
+      } else {
+        promptTextarea.value = prompts[event.target.value] || promptTextarea.value;
+      }
+    });
+  }
+</script>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="imageModalLabel">Scene Image</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img id="modalImage" src="" alt="Scene" class="img-fluid" style="max-height: 80vh;">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Handle modal image display
+  const imageModal = document.getElementById('imageModal');
+  if (imageModal) {
+    imageModal.addEventListener('show.bs.modal', function (event) {
+      const button = event.relatedTarget;
+      const imageUrl = button.getAttribute('data-image-url');
+      const imageTitle = button.getAttribute('data-image-title');
+      const modalImage = imageModal.querySelector('#modalImage');
+      const modalTitle = imageModal.querySelector('#imageModalLabel');
+      
+      modalImage.src = imageUrl;
+      modalImage.alt = imageTitle;
+      modalTitle.textContent = imageTitle;
+    });
+  }
+</script>
+{% endblock %}
+
